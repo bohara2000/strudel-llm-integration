@@ -27,11 +27,10 @@
             clear: both;
         }
 
-        .main-content
-        {
+        .main-content {
             height: 100%;
         }
-        
+
         .main-content,
         .editor-container {
             padding: 20px;
@@ -132,8 +131,8 @@
                 <div class="row">
                     <div class="col">
                         <div id="controls">
-                            <button onclick="addToREPL()">Add to REPL</button>
-                            <button onclick="requestChanges()">Request Changes</button>
+                            <button onclick="addPoemToREPL()">Add poem to REPL</button>
+                            <!-- <button onclick="requestChanges()">Request Changes</button> -->
                         </div>
                         <div id="output"></div>
                     </div>
@@ -308,8 +307,20 @@ This pattern uses a faster tempo and introduces the Dorian mode. The jux(rev) fu
             document.getElementById('conversationHistory').value = conversationHistory.join('\n');
         }
 
-        function addToREPL() {
-            const code = document.getElementById('llmResponse').value;
+        function addPoemToREPL() {
+            // get the poem from the last message in the chat log
+            const chatLog = document.getElementById('chat-log');
+            const poem = chatLog.lastChild.innerText;
+            const slider = document.getElementById('mySlider');
+            console.log(poem.split('\n'));
+
+            // build new code based on the template
+            let code = fillCodeTemplate(codeTemplate, {
+                currentValue: slider.value,
+                wordlist: convertToWordArray(poem),
+                samplecalls: poem.split('\n')
+            });
+ 
             repl.setAttribute('code', code);
             document.getElementById('output').innerHTML = "Code added to Strudel REPL.";
         }
@@ -355,6 +366,54 @@ This pattern uses a faster tempo and introduces the Dorian mode. The jux(rev) fu
         function updateSliderValue() {
             //console.log('input changed');
             sliderValue.textContent = slider.value;
+        }
+        function generateSampleCalls(poem) {
+            const calls = [];
+            console.log('my poem');
+            poem.forEach(element => {
+                words = convertToWordArray(element);
+                calls.push(`samples('shabda/speech:${words.join(',')}')`);
+            });
+            return calls.join('\n');
+        }
+
+        function fillCodeTemplate(template, values) {
+            return template.replace(/{{(\w+)}}/g, (match, key) => {
+                if (key in values) {
+                    if (key === 'wordlist') {
+                        return JSON.stringify(values[key]);
+                    } else if (key === 'samplecalls') {
+                        return generateSampleCalls(values[key]);
+                    }
+                    return values[key];
+                }
+                return match; // Keep the placeholder if no value is provided
+            });
+        }
+
+
+        function convertToWordArray(inputString) {
+            // List of articles and conjunctions to join with the next word
+            const joinWords = ['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'yet', 'so'];
+
+            // Remove punctuation and split the input string into words
+            let words = inputString.toLowerCase()
+                .replace(/[.,\'\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+                .split(/\s+/);
+
+            let result = [];
+            for (let i = 0; i < words.length; i++) {
+                if (joinWords.includes(words[i]) && i < words.length - 1) {
+                    // If the current word is in joinWords and not the last word,
+                    // join it with the next word using an underscore
+                    result.push(words[i] + '_' + words[i + 1]);
+                    i++; // Skip the next word since we've already included it
+                } else {
+                    result.push(words[i]);
+                }
+            }
+
+            return result;
         }
 
         function animateSlider(start, end, duration, callback) {
@@ -407,6 +466,34 @@ This pattern uses a faster tempo and introduces the Dorian mode. The jux(rev) fu
 
 
         const repl = document.createElement('strudel-editor');
+
+        const codeTemplate = `// Define a basic pattern
+let _current = {{currentValue}};
+let words = {{wordlist}}
+
+{{samplecalls}}
+
+// Add event listener for custom pitch change event
+document.addEventListener('sliderChange', (e) => {
+    _current = e.detail.value;
+  console.log(e.detail.value);
+})
+
+let current = ref(() => _current)
+
+$: note("<c eb g bb>*8")
+  .s("sawtooth").lpenv(2).lpq(8)
+  .lpf(slider(current, 100, 2000, 1))
+  
+$: s(words).speed(rand.range(0.85,1.1))  
+  .slow("2,4,4,2")
+  .penv("<.5 0 7 -2>*2").vib("4:.1")
+  .room(.3)
+  .jux(rev)
+  .gain(choose(0, 0.5, 0.25))
+  .sometimesBy(0.4, x=>x.speed("-1"))`;
+
+
         let startCode = `// Define a basic pattern
 let _current = 746;
 
