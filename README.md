@@ -50,7 +50,7 @@ The web page provides:
     ```
 2. Open the web page in your browser:
     ```sh
-    open http://localhost:3000
+    open http://localhost:5000
     ```
 
 ## Usage
